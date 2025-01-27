@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chromapages Assistant</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>Chromapages Assistant</h1>
+            <p>Ask me anything about our web design and development services</p>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <div class="message assistant">
+                <div class="message-content">
+                    Hello! I'm here to help you with questions about Chromapages' services. What would you like to know?
+                </div>
+            </div>
+        </div>
+        <div class="chat-input">
+            <form id="chat-form">
+                <input type="text" id="user-input" placeholder="Type your message here..." autocomplete="off">
+                <button type="submit">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </div>
+    <script src="/static/script.js"></script>
+</body>
+</html> 
