@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import smtplib
+import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import json
@@ -8,8 +9,8 @@ from typing import Dict, List, Optional
 
 class AppointmentAgent:
     def __init__(self):
-        self.smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        self.smtp_server = os.getenv("SMTP_SERVER", "smtp.hostinger.com")
+        self.smtp_port = int(os.getenv("SMTP_PORT", "465"))
         self.email_address = os.getenv("EMAIL_ADDRESS")
         self.email_password = os.getenv("EMAIL_PASSWORD")
         self.available_slots = self._load_available_slots()
@@ -94,7 +95,7 @@ class AppointmentAgent:
         self._send_email(self.email_address, business_subject, business_body)
 
     def _send_email(self, to_email: str, subject: str, body: str):
-        """Send an email using SMTP"""
+        """Send an email using SMTP with SSL"""
         msg = MIMEMultipart()
         msg['From'] = self.email_address
         msg['To'] = to_email
@@ -103,13 +104,17 @@ class AppointmentAgent:
         msg.attach(MIMEText(body, 'plain'))
 
         try:
-            server = smtplib.SMTP(self.smtp_server, self.smtp_port)
-            server.starttls()
-            server.login(self.email_address, self.email_password)
-            server.send_message(msg)
-            server.quit()
+            # Create a secure SSL/TLS context
+            context = ssl.create_default_context()
+            
+            # Connect to Hostinger SMTP server using SSL
+            with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port, context=context) as server:
+                server.login(self.email_address, self.email_password)
+                server.send_message(msg)
+                
         except Exception as e:
             print(f"Error sending email: {str(e)}")
+            raise
 
     def qualify_lead(self, conversation_history: List[str]) -> bool:
         """

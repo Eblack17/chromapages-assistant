@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 from rag_agent import ChromapagesRAGAgent
 from appointment_agent import AppointmentAgent
+from ticket_manager import TicketManager, TicketStatus, TicketPriority
 import os
 
 app = Flask(__name__)
@@ -18,6 +19,7 @@ CORS(app, resources={
 # Initialize agents lazily
 rag_agent = None
 appointment_agent = None
+ticket_manager = None
 conversation_history = []
 
 def get_rag_agent():
@@ -31,6 +33,12 @@ def get_appointment_agent():
     if appointment_agent is None:
         appointment_agent = AppointmentAgent()
     return appointment_agent
+
+def get_ticket_manager():
+    global ticket_manager
+    if ticket_manager is None:
+        ticket_manager = TicketManager()
+    return ticket_manager
 
 @app.route('/_ah/health')
 def health_check():
@@ -73,6 +81,92 @@ def chat():
         return jsonify({'response': response})
     except Exception as e:
         app.logger.error(f"Error processing chat request: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/tickets', methods=['POST'])
+def create_ticket():
+    """Create a new support ticket"""
+    try:
+        data = request.json
+        required_fields = ['subject', 'description', 'customer_email']
+        if not all(field in data for field in required_fields):
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        priority = TicketPriority[data.get('priority', 'MEDIUM').upper()]
+        ticket_manager = get_ticket_manager()
+        
+        ticket_id = ticket_manager.create_ticket(
+            subject=data['subject'],
+            description=data['description'],
+            customer_email=data['customer_email'],
+            priority=priority,
+            conversation_history=conversation_history
+        )
+        
+        return jsonify({'ticket_id': ticket_id, 'message': 'Ticket created successfully'})
+    except Exception as e:
+        app.logger.error(f"Error creating ticket: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/tickets/<ticket_id>', methods=['GET'])
+def get_ticket(ticket_id):
+    """Get a specific ticket"""
+    try:
+        ticket_manager = get_ticket_manager()
+        ticket = ticket_manager.get_ticket(ticket_id)
+        if ticket:
+            return jsonify(ticket)
+        return jsonify({'error': 'Ticket not found'}), 404
+    except Exception as e:
+        app.logger.error(f"Error getting ticket: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/tickets/<ticket_id>/status', methods=['PUT'])
+def update_ticket_status(ticket_id):
+    """Update ticket status"""
+    try:
+        data = request.json
+        if 'status' not in data:
+            return jsonify({'error': 'Status is required'}), 400
+
+        status = TicketStatus[data['status'].upper()]
+        note = data.get('note')
+        
+        ticket_manager = get_ticket_manager()
+        if ticket_manager.update_ticket_status(ticket_id, status, note):
+            return jsonify({'message': 'Status updated successfully'})
+        return jsonify({'error': 'Ticket not found'}), 404
+    except Exception as e:
+        app.logger.error(f"Error updating ticket status: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/tickets/<ticket_id>/comments', methods=['POST'])
+def add_ticket_comment(ticket_id):
+    """Add a comment to a ticket"""
+    try:
+        data = request.json
+        if 'comment' not in data:
+            return jsonify({'error': 'Comment is required'}), 400
+
+        is_customer = data.get('is_customer', False)
+        ticket_manager = get_ticket_manager()
+        
+        if ticket_manager.add_comment(ticket_id, data['comment'], is_customer):
+            return jsonify({'message': 'Comment added successfully'})
+        return jsonify({'error': 'Ticket not found'}), 404
+    except Exception as e:
+        app.logger.error(f"Error adding comment: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/tickets/customer/<email>', methods=['GET'])
+def get_customer_tickets(email):
+    """Get all tickets for a customer"""
+    try:
+        ticket_manager = get_ticket_manager()
+        tickets = ticket_manager.get_tickets_by_customer(email)
+        return jsonify({'tickets': tickets})
+    except Exception as e:
+        app.logger.error(f"Error getting customer tickets: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/appointments/available', methods=['GET'])
