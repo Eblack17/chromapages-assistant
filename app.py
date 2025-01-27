@@ -1,8 +1,18 @@
 from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS
 from rag_agent import ChromapagesRAGAgent
 import os
 
 app = Flask(__name__)
+
+# Configure CORS
+CORS(app, resources={
+    r"/*": {
+        "origins": ["http://localhost:5173"],
+        "methods": ["POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
 # Initialize the agent lazily to avoid startup timeout
 agent = None
@@ -22,8 +32,11 @@ def health_check():
 def home():
     return render_template('index.html')
 
-@app.route('/chat', methods=['POST'])
+@app.route('/chat', methods=['POST', 'OPTIONS'])
 def chat():
+    if request.method == 'OPTIONS':
+        return '', 204
+        
     try:
         data = request.json
         message = data.get('message', '')
