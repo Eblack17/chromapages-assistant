@@ -3,7 +3,20 @@ from rag_agent import ChromapagesRAGAgent
 import os
 
 app = Flask(__name__)
-agent = ChromapagesRAGAgent()
+
+# Initialize the agent lazily to avoid startup timeout
+agent = None
+
+def get_agent():
+    global agent
+    if agent is None:
+        agent = ChromapagesRAGAgent()
+    return agent
+
+@app.route('/_ah/health')
+def health_check():
+    """Health check endpoint for Cloud Run"""
+    return jsonify({"status": "healthy"}), 200
 
 @app.route('/')
 def home():
@@ -11,17 +24,20 @@ def home():
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    data = request.json
-    message = data.get('message', '')
-    
-    if not message:
-        return jsonify({'error': 'No message provided'}), 400
-    
     try:
-        response = agent.chat(message)
+        data = request.json
+        message = data.get('message', '')
+        
+        if not message:
+            return jsonify({'error': 'No message provided'}), 400
+        
+        # Get agent instance
+        current_agent = get_agent()
+        response = current_agent.chat(message)
         return jsonify({'response': response})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"Error processing chat request: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

@@ -26,5 +26,11 @@ EXPOSE 8080
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 
-# Run the application
-CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 app:app 
+# Set Python to run in unbuffered mode
+ENV PYTHONUNBUFFERED True
+
+# Increase timeout for gunicorn
+ENV GUNICORN_TIMEOUT 120
+
+# Run the application with increased timeout
+CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout ${GUNICORN_TIMEOUT} --access-logfile - --error-logfile - --log-level info app:app 
