@@ -4,13 +4,14 @@ from rag_agent import ChromapagesRAGAgent
 from appointment_agent import AppointmentAgent
 from ticket_manager import TicketManager, TicketStatus, TicketPriority
 import os
+import re
 
 app = Flask(__name__)
 
-# Configure CORS
+# Configure CORS - Allow all origins for development
 CORS(app, resources={
     r"/*": {
-        "origins": ["http://localhost:5173"],
+        "origins": "*",
         "methods": ["POST", "OPTIONS", "GET"],
         "allow_headers": ["Content-Type"]
     }
@@ -40,6 +41,29 @@ def get_ticket_manager():
         ticket_manager = TicketManager()
     return ticket_manager
 
+def get_direct_response(message: str) -> str:
+    """Get direct response based on message content"""
+    message_lower = message.lower()
+    
+    # Pricing related queries
+    if any(word in message_lower for word in ['pricing', 'cost', 'price', 'expensive', 'cheap']):
+        return "Our pricing varies based on project requirements. For a website, prices typically start at $2,000. Would you like to discuss your specific project needs?"
+    
+    # Contact related queries
+    if any(word in message_lower for word in ['contact', 'reach', 'email', 'phone']):
+        return "You can reach us at contact@chromapages.com or fill out our contact form. Would you like me to guide you to the contact form?"
+    
+    # Services related queries
+    if any(word in message_lower for word in ['services', 'offer', 'provide', 'do you']):
+        return "We offer web design, development, and digital marketing services. This includes custom website development, e-commerce solutions, SEO optimization, and brand development. What specific service are you interested in?"
+    
+    # Timeline related queries
+    if any(word in message_lower for word in ['time', 'long', 'duration', 'timeline', 'when']):
+        return "Project timelines vary based on complexity. A typical website takes 4-8 weeks from start to finish. Would you like to discuss your project timeline?"
+    
+    # If no direct match, return None to fallback to RAG
+    return None
+
 @app.route('/_ah/health')
 def health_check():
     """Health check endpoint for Cloud Run"""
@@ -61,9 +85,15 @@ def chat():
         if not message:
             return jsonify({'error': 'No message provided'}), 400
         
-        # Get agent instance and process message
-        current_agent = get_rag_agent()
-        response = current_agent.chat(message)
+        # Try to get a direct response first
+        direct_response = get_direct_response(message)
+        
+        if direct_response:
+            response = direct_response
+        else:
+            # Fallback to RAG agent for more complex queries
+            current_agent = get_rag_agent()
+            response = current_agent.chat(message)
         
         # Store conversation history
         conversation_history.append({
